@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Access Governance{% endblock %} | Access Governance</title>
+<link rel="preload" href="/static/fonts/plus-jakarta-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+{% if user %}
+{% set path = request.url.path %}
+<div class="shell">
+  <aside class="side">
+    <a class="brand" href="/">
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
+        <rect width="30" height="30" rx="9" fill="#0F6B5E"/>
+        <rect x="7" y="9" width="16" height="3" rx="1.5" fill="#9FDCCB"/>
+        <rect x="7" y="13.5" width="10" height="3" rx="1.5" fill="#F2C46B"/>
+        <rect x="7" y="18" width="13" height="3" rx="1.5" fill="#9FDCCB" opacity=".6"/>
+      </svg>
+      <span>Access<br>Governance</span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a href="/" class="{{ 'on' if path == '/' }}">{{ icon('home') }}<span>Home</span></a>
+      {% if 'manager' in user.roles or 'hr' in user.roles or 'security' in user.roles %}
+      <a href="/dashboard" class="{{ 'on' if path.startswith('/dashboard') }}">{{ icon('dashboard') }}<span>Dashboard</span></a>{% endif %}
+      <a href="/approvals" class="{{ 'on' if path.startswith('/approvals') }}">{{ icon('approvals') }}<span>Approvals</span>
+        {% if nav.approvals %}<span class="count">{{ nav.approvals }}</span>{% endif %}</a>
+      <a href="/reviews" class="{{ 'on' if path.startswith('/reviews') }}">{{ icon('reviews') }}<span>Access reviews</span>
+        {% if nav.reviews %}<span class="count">{{ nav.reviews }}</span>{% endif %}</a>
+      <a href="/requests" class="{{ 'on' if path.startswith('/requests') }}">{{ icon('requests') }}<span>Requests</span></a>
+      <a href="/people" class="{{ 'on' if path.startswith('/people') }}">{{ icon('people') }}<span>{{ 'People' if ('hr' in user.roles or 'security' in user.roles) else 'My team' }}</span></a>
+      <a href="/catalog" class="{{ 'on' if path.startswith('/catalog') }}">{{ icon('catalog') }}<span>Access catalog</span></a>
+      {% if 'security' in user.roles or 'hr' in user.roles %}<div class="group-label">Governance</div>{% endif %}
+      {% if 'security' in user.roles %}
+      <a href="/campaigns" class="{{ 'on' if path.startswith('/campaigns') }}">{{ icon('campaigns') }}<span>Review campaigns</span></a>
+      <a href="/security" class="{{ 'on' if path.startswith('/security') }}">{{ icon('security') }}<span>Security</span>
+        {% if nav.alerts %}<span class="count alert">{{ nav.alerts }}</span>{% endif %}</a>
+      {% endif %}
+      {% if 'security' in user.roles or 'hr' in user.roles %}
+      <a href="/audit" class="{{ 'on' if path.startswith('/audit') }}">{{ icon('audit') }}<span>Audit log</span></a>
+      {% endif %}
+    </nav>
+    <div class="me">
+      {{ avatar(user.name) }}
+      <div class="me-text">
+        <strong>{{ user.name }}</strong>
+        <span>{{ POSITIONS[user.emp.position].title }}</span>
+        <span class="roles">{% for r in user.roles %}{{ {'hr':'HR','security':'IT Security','manager':'Manager'}[r] }}{{ ', ' if not loop.last }}{% else %}Employee{% endfor %}</span>
+      </div>
+      <form method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button title="Sign out" aria-label="Sign out">{{ icon('logout') }}</button></form>
+    </div>
+  </aside>
+  <main>
+    {% if flash %}<div class="flash {{ flash.kind }}" role="status">{{ flash.text }}</div>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% else %}
+{% block bare %}{% endblock %}
+{% endif %}
+</body>
+</html>

@@ -1,0 +1,47 @@
+# Katalog akses: sumber kebenaran untuk siapa mendapat apa.
+#
+# groups     : group AD yang dikelola IGA (dibuat di OU=Corp,OU=Groups).
+#              privileged: true -> butuh persetujuan kedua dari IT Security
+#              max_days        -> batas maksimal akses sementara lewat permintaan
+# positions  : jabatan; groups = akses bawaan (birthright) yang otomatis diberikan saat joiner/mover.
+# tier0      : group bawaan AD yang SENGAJA di luar hak tulis IGA; hanya dipantau.
+
+groups:
+  GRP-Finance:        {description: "Finance department",              requestable: false}
+  GRP-IT:             {description: "IT department",                   requestable: false}
+  GRP-HR:             {description: "Human Resources department",      requestable: false}
+  GRP-Operations:     {description: "Operations department",           requestable: false}
+  GRP-Sales:          {description: "Sales department",                requestable: false}
+  VPN-Users:          {description: "Remote access VPN",               requestable: true, max_days: 180}
+  APP-ERP-User:       {description: "ERP: view and create transactions", requestable: true, max_days: 90}
+  APP-ERP-Approver:   {description: "ERP: approve payments",           requestable: true, privileged: true, max_days: 30}
+  APP-CRM:            {description: "CRM: customer data",              requestable: true, max_days: 90}
+  APP-HRIS:           {description: "HR system: employee records",     requestable: true, privileged: true, max_days: 30}
+  SHARE-Finance:      {description: "Finance shared drive",            requestable: true, max_days: 60}
+  SHARE-HR-Confidential: {description: "HR confidential drive",        requestable: true, privileged: true, max_days: 14}
+  Server-Admins:      {description: "Local admin on application servers", requestable: true, privileged: true, max_days: 7}
+  DB-Admins:          {description: "Database administrator",          requestable: true, privileged: true, max_days: 7}
+  IGA-HR:             {description: "Portal role: HR administration",  requestable: false, privileged: true}
+  IGA-Security:       {description: "Portal role: IT Security",        requestable: false, privileged: true}
+
+departments: [Finance, IT, HR, Operations, Sales]
+
+positions:
+  fin-staff:       {title: "Finance Staff",        department: Finance,    groups: [GRP-Finance, VPN-Users, APP-ERP-User, SHARE-Finance]}
+  fin-manager:     {title: "Finance Manager",      department: Finance,    groups: [GRP-Finance, VPN-Users, APP-ERP-User, APP-ERP-Approver, SHARE-Finance]}
+  it-engineer:     {title: "IT Engineer",          department: IT,         groups: [GRP-IT, VPN-Users]}
+  it-dba:          {title: "Database Administrator", department: IT,       groups: [GRP-IT, VPN-Users, DB-Admins]}
+  it-security:     {title: "Security Analyst",     department: IT,         groups: [GRP-IT, VPN-Users, IGA-Security]}
+  it-manager:      {title: "IT Manager",           department: IT,         groups: [GRP-IT, VPN-Users]}
+  hr-staff:        {title: "HR Officer",           department: HR,         groups: [GRP-HR, APP-HRIS, IGA-HR]}
+  hr-manager:      {title: "HR Manager",           department: HR,         groups: [GRP-HR, APP-HRIS, IGA-HR, SHARE-HR-Confidential]}
+  ops-staff:       {title: "Operations Staff",     department: Operations, groups: [GRP-Operations]}
+  ops-supervisor:  {title: "Operations Supervisor", department: Operations, groups: [GRP-Operations, VPN-Users, APP-ERP-User]}
+  ops-manager:     {title: "Operations Manager",   department: Operations, groups: [GRP-Operations, VPN-Users, APP-ERP-User, APP-ERP-Approver]}
+  sales-exec:      {title: "Sales Executive",      department: Sales,      groups: [GRP-Sales, VPN-Users, APP-CRM]}
+  sales-manager:   {title: "Sales Manager",        department: Sales,      groups: [GRP-Sales, VPN-Users, APP-CRM, APP-ERP-User]}
+
+# Batas maksimal jabatan sementara (acting)
+acting_max_days: 90
+
+tier0: [Domain Admins, Enterprise Admins, Schema Admins, Administrators, Account Operators, Backup Operators, Server Operators]

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ c.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ c.name }}</h1>
+    <p>{{ 'All access' if c.scope == 'all' else 'Privileged access only' }}, due {{ c.due_date|date }}{% if c.status == 'closed' %}, closed {{ c.closed_at|dt }}{% endif %}.</p></div>
+  <div class="btn-row">
+    <a class="btn" href="/campaigns/{{ c.id }}/report.csv">Download evidence (CSV)</a>
+    {% if c.status == 'open' %}<form method="post" action="/campaigns/{{ c.id }}/close"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Close campaign</button></form>{% endif %}
+  </div>
+</div>
+<div class="cols">
+  <div class="stack">
+    <section class="panel">
+      <header><div><h2>Managers</h2><p>Sorted by most items still open.</p></div></header>
+      <div class="table-wrap"><table>
+        <tr><th>Manager</th><th>Progress</th><th>Removed</th></tr>
+        {% for r in reviewers %}
+        <tr><td><a href="/people/{{ r.id }}">{{ r.first_name }} {{ r.last_name }}</a></td>
+          <td style="min-width:200px"><div class="progress"><span style="width:{{ (r.done * 100 / r.total)|round }}%"></span></div>
+            <div class="sub">{{ r.done }} of {{ r.total }}</div></td><td>{{ r.revoked or 0 }}</td></tr>
+        {% endfor %}
+      </table></div>
+    </section>
+    <section class="panel">
+      <header><h2>Access removed in this campaign</h2></header>
+      <div class="table-wrap"><table>
+        <tr><th>Person</th><th>Access</th><th>Removed by</th><th>When</th></tr>
+        {% for r in revoked %}
+        <tr><td><a href="/people/{{ r.employee_id }}">{{ r.first_name }} {{ r.last_name }}</a></td><td>{{ r.group_name }} <span class="chip {{ 'role' if r.source == 'birthright' else r.source }}">{{ SOURCE_LABEL[r.source] }}</span></td>
+          <td>{{ r.rf }} {{ r.rl }}</td><td>{{ r.decided_at|dt }}</td></tr>
+        {% else %}<tr><td colspan="4" class="empty">Nothing removed yet.</td></tr>{% endfor %}
+      </table></div>
+    </section>
+  </div>
+  <section class="panel health">
+    <header><h2>Summary</h2></header>
+    <div class="body">
+      <div class="progress" style="margin-bottom:12px"><span style="width:{{ s.pct }}%"></span></div>
+      <dl><dt>Items</dt><dd>{{ s.total }}</dd><dt>Kept</dt><dd>{{ s.kept }}</dd>
+        <dt>Removed</dt><dd>{{ s.revoked }}</dd><dt>Not reviewed yet</dt><dd>{{ s.total - s.done }}</dd></dl>
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}{{ full_name(emp) }}{% endblock %}
+{% block content %}
+{% set pos = POSITIONS[emp.position] %}
+<div class="page-head">
+  <div class="person-head">
+    {{ avatar(emp.first_name ~ " " ~ emp.last_name, "lg") }}
+    <div><h1>{{ full_name(emp) }}</h1>
+      <p>{{ pos.title }}, {{ emp.department }}
+        {% if emp.status == 'terminated' %}<span class="chip danger">Left {{ emp.end_date|date }}</span>
+        {% elif emp.status == 'scheduled' %}<span class="chip neutral">Starts {{ emp.start_date|date }}</span>{% endif %}</p></div>
+  </div>
+  {% if emp.status == 'active' and (emp.id == user.employee_id or emp.manager_id == user.employee_id) %}
+  <div class="btn-row">
+    <a class="btn" href="/requests/new?for={{ emp.id }}">Request access</a>
+    <a class="btn" href="/requests/new?kind=acting&for={{ emp.id }}">Request acting position</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if emp.acting_position %}
+<p class="acting-note">Acting as <b>{{ POSITIONS[emp.acting_position].title }}</b> until {{ emp.acting_until|date }}. The extra access is removed automatically the day after.</p>
+{% endif %}
+
+<div class="cols">
+  <div class="stack">
+    <section class="panel">
+      <header><div><h2>Access timeline</h2><p>The last 90 days and the next 45. Temporary access ends where its bar ends.</p></div>
+        <div class="legend"><span><i class="standing"></i>Role access</span><span><i class="temporary"></i>Temporary</span><span><i class="revoked"></i>Removed</span></div>
+      </header>
+      {% if tl.bars %}
+      <div class="tl">
+        <div class="tl-axis"><div></div>
+          <div class="track">{% for t in tl.ticks %}<span class="tick" style="left:{{ t.left }}%">{{ t.label }}</span>{% endfor %}
+            <span class="tick tl-today-label" style="left:{{ tl.today }}%">Today</span></div></div>
+        {% for b in tl.bars %}
+        <div class="tl-row">
+          <div class="name"><b title="{{ GROUPS[b.group_name].description if b.group_name in GROUPS }}">{{ b.group_name }}</b>
+            {% if is_privileged(b.group_name) %}<span class="chip priv">Privileged</span>{% endif %}</div>
+          <div class="track">
+            <span class="today" style="left:{{ tl.today }}%" aria-hidden="true"></span>
+            <span class="bar {{ b.state }}" style="left:{{ b.left }}%;width:{{ b.width }}%"
+                  title="{{ SOURCE_LABEL[b.source] }} access, granted {{ b.granted_at|date }}{% if b.revoked_at %}, removed {{ b.revoked_at|date }} ({{ b.revoked_reason }}){% elif b.expires_at %}, ends {{ b.expires_at|date }}{% endif %}"></span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}<div class="empty">No access in this period.</div>{% endif %}
+    </section>
+
+    <section class="panel">
+      <header><h2>Current access</h2><span class="small muted">{{ active|length }} groups in Active Directory</span></header>
+      <div class="table-wrap"><table>
+        <tr><th>Group</th><th>Why they have it</th><th>Since</th><th>Ends</th></tr>
+        {% for e in active %}
+        <tr><td><b>{{ e.group_name }}</b><div class="sub">{{ GROUPS[e.group_name].description if e.group_name in GROUPS }}</div></td>
+          <td><span class="chip {{ 'role' if e.source == 'birthright' else e.source }}">{{ SOURCE_LABEL[e.source] }}</span>
+            {% if e.request_id %}<a class="small" href="/requests/{{ e.request_id }}">#{{ e.request_id }}</a>{% endif %}</td>
+          <td>{{ e.granted_at|date }}</td>
+          <td>{% if e.expires_at %}{{ e.expires_at|date }} <span class="sub">({{ e.expires_at|rel }})</span>{% else %}<span class="muted">With the role</span>{% endif %}</td></tr>
+        {% else %}<tr><td colspan="4" class="muted">No access.</td></tr>{% endfor %}
+      </table></div>
+    </section>
+
+    <section class="panel">
+      <header><h2>History</h2></header>
+      <ul class="feed">
+        {% for a in history %}
+        <li class="{{ 'failed' if a.failed }}">{{ avatar(a.actor, 'sm') }}<p><b>{{ a.actor }}</b> {{ a.text }}</p>
+          <time title="{{ a.ts|dt }}">{{ a.ts|ago }}</time></li>
+        {% else %}<li class="muted">No history yet.</li>{% endfor %}
+      </ul>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel">
+      <header><h2>Details</h2></header>
+      <div class="body"><dl class="facts">
+        <dt>Employee ID</dt><dd>{{ emp.id }}</dd>
+        <dt>Account</dt><dd>{{ emp.sam or 'Not created yet' }}</dd>
+        <dt>Manager</dt><dd>{% if emp.manager_id %}<a href="/people/{{ emp.manager_id }}">{{ full_name(employees[emp.manager_id]) }}</a>{% else %}None{% endif %}</dd>
+        <dt>Started</dt><dd>{{ emp.start_date|date }}</dd>
+        {% if reports %}<dt>Reports</dt><dd>{{ reports|length }} people</dd>{% endif %}
+      </dl></div>
+    </section>
+
+    {% if 'hr' in user.roles and emp.status == 'active' %}
+    <section class="panel">
+      <header><div><h2>Change position</h2><p>Mover: old role access is removed, new role access is added.</p></div></header>
+      <form class="body" method="post" action="/people/{{ emp.id }}/move">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="field"><label for="mv-pos">New position</label>
+          <select id="mv-pos" name="position">{% for k, p in POSITIONS.items() %}
+            <option value="{{ k }}" {{ 'selected' if k == emp.position }}>{{ p.title }} ({{ p.department }})</option>{% endfor %}</select></div>
+        <div class="field"><label for="mv-mgr">Manager</label>
+          <select id="mv-mgr" name="manager_id"><option value="">No manager</option>{% for m in managers if m.id != emp.id %}
+            <option value="{{ m.id }}" {{ 'selected' if m.id == emp.manager_id }}>{{ full_name(m) }}, {{ POSITIONS[m.position].title }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="mv-date">Effective</label><input id="mv-date" type="date" name="effective_date" value="{{ today }}" min="{{ today }}"></div>
+        <button class="btn">Apply move</button>
+      </form>
+    </section>
+
+    {% if emp.id != user.employee_id %}
+    <section class="panel">
+      <header><div><h2>Process departure</h2><p>Leaver: the account is disabled and all access is removed.</p></div></header>
+      <form class="body" method="post" action="/people/{{ emp.id }}/terminate">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="field"><label for="lv-date">Last day</label><input id="lv-date" type="date" name="effective_date" value="{{ today }}" min="{{ today }}"></div>
+        <div class="field"><label for="lv-confirm">Type <code>{{ emp.sam }}</code> to confirm</label><input id="lv-confirm" type="text" name="confirm" autocomplete="off"></div>
+        <button class="btn danger">Process departure</button>
+      </form>
+    </section>
+    {% endif %}
+    {% endif %}
+
+    {% if reqs %}
+    <section class="panel">
+      <header><h2>Requests</h2></header>
+      <ul class="rows">{% for r in reqs %}
+        <li><a href="/requests/{{ r.id }}">#{{ r.id }} {% if r.kind == 'group' %}{{ r.target }}{% else %}Acting {{ POSITIONS[r.target].title }}{% endif %}</a>
+          <div class="sub muted small">{{ STATUS_LABEL[r.status] }}, {{ r.start_date|date }} to {{ r.end_date|date }}</div></li>{% endfor %}</ul>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

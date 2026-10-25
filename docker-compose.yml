@@ -1,0 +1,119 @@
+name: iga-lab
+
+services:
+  dc1:
+    build: ./samba
+    container_name: iga-dc1
+    hostname: dc1
+    restart: unless-stopped
+    environment:
+      AD_HOSTNAME: dc1
+      AD_REALM: ${AD_REALM}
+      AD_DOMAIN: ${AD_DOMAIN}
+      AD_ADMIN_PASSWORD: ${AD_ADMIN_PASSWORD}
+      IGA_SERVICE_PASSWORD: ${IGA_SERVICE_PASSWORD}
+    networks:
+      lab:
+        aliases: [dc1.corp.lab]
+    ports:
+      - "127.0.0.1:6360:636"  # LDAPS hanya dari laptop sendiri (LDAP browser, uji e2e); 6360 agar tidak bentrok dengan lab AD lain
+    volumes:
+      - samba_data:/samba
+      - tls:/tls
+      - audit:/audit
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/636'"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 20s
+
+  mysql:
+    build: ./mysql
+    container_name: iga-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?isi MYSQL_ROOT_PASSWORD di .env}
+      MYSQL_DATABASE: iga
+      MYSQL_APP_PASSWORD: ${MYSQL_APP_PASSWORD:?isi MYSQL_APP_PASSWORD di .env}
+      MYSQL_READER_PASSWORD: ${MYSQL_READER_PASSWORD:?isi MYSQL_READER_PASSWORD di .env}
+      TZ: ${IGA_TIMEZONE:-Asia/Jakarta}
+    networks: [lab]
+    ports:
+      - "127.0.0.1:3307:3306"  # MySQL Workbench / Grafana dari laptop sendiri; 3307 agar tidak bentrok dengan MySQL lokal
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+  iga:
+    build: ./app
+    container_name: iga-portal
+    restart: unless-stopped
+    environment:
+      AD_HOST: dc1.corp.lab
+      AD_REALM: ${AD_REALM}
+      AD_CA_FILE: /tls/ca.crt
+      AUDIT_DIR: /audit
+      IGA_SERVICE_USER: svc-iga
+      IGA_SERVICE_PASSWORD: ${IGA_SERVICE_PASSWORD}
+      IGA_SECRET_KEY: ${IGA_SECRET_KEY}
+      IGA_TIMEZONE: ${IGA_TIMEZONE:-Asia/Jakarta}
+      IGA_INITIAL_PASSWORD: ${IGA_INITIAL_PASSWORD}
+      IGA_FORCE_PASSWORD_CHANGE: ${IGA_FORCE_PASSWORD_CHANGE:-false}
+      IGA_SEED_DEMO: ${IGA_SEED_DEMO:-true}
+      IGA_WORKER_INTERVAL: 30
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: iga
+      MYSQL_USER: iga_app
+      MYSQL_PASSWORD: ${MYSQL_APP_PASSWORD:?isi MYSQL_APP_PASSWORD di .env}
+    networks: [lab]
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - tls:/tls:ro
+      - audit:/audit:ro
+    depends_on:
+      dc1:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+
+  # Aktivitas login karyawan untuk LAB (agar halaman Security punya data). Matikan untuk domain sungguhan.
+  lab-activity:
+    build: ./tools
+    container_name: iga-lab-activity
+    restart: unless-stopped
+    environment:
+      AD_HOST: dc1.corp.lab
+      AD_REALM: ${AD_REALM}
+      AD_CA_FILE: /tls/ca.crt
+      AD_ADMIN_PASSWORD: ${AD_ADMIN_PASSWORD}
+      IGA_INITIAL_PASSWORD: ${IGA_INITIAL_PASSWORD}
+      MYSQL_HOST: mysql
+      MYSQL_DATABASE: iga
+      MYSQL_USER: iga_reader      # hanya perlu membaca daftar karyawan
+      MYSQL_PASSWORD: ${MYSQL_READER_PASSWORD:?isi MYSQL_READER_PASSWORD di .env}
+      IGA_TIMEZONE: ${IGA_TIMEZONE:-Asia/Jakarta}
+    networks: [lab]
+    volumes:
+      - tls:/tls:ro
+    depends_on:
+      iga:
+        condition: service_healthy
+
+networks:
+  lab:
+
+volumes:
+  samba_data:
+  tls:
+  audit:
+  mysql_data:

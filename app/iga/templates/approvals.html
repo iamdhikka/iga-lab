@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Approvals{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Approvals</h1>
+  <p>Requests waiting for you. Check the reason and the period; shorter is safer.</p></div></div>
+<div class="stack">
+{% for r in rows %}{% set b = employees[r.beneficiary_id] %}
+<section class="panel">
+  <header><div style="display:flex;gap:13px;align-items:flex-start">{{ avatar(full_name(b)) }}<div><h2><a href="/requests/{{ r.id }}">{{ full_name(b) }}: {% if r.kind == 'group' %}{{ r.target }}{% else %}acting {{ POSITIONS[r.target].title }}{% endif %}</a>
+    {% if r.privileged %}<span class="chip priv">Privileged</span>{% endif %}</h2>
+    <p>{{ POSITIONS[b.position].title }}, {{ r.start_date|date }} to {{ r.end_date|date }}, you decide as {{ 'manager' if r.status == 'pending_manager' else 'IT Security' }}</p></div></div>
+    <span class="small muted">#{{ r.id }}, {{ r.created_at|rel }}</span></header>
+  <div class="body" style="padding-left:73px"><p style="white-space:pre-line;max-width:75ch;margin:0">{{ r.justification }}</p></div>
+  <form class="decision" method="post" action="/requests/{{ r.id }}/decide">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="next" value="/approvals">
+    <div class="filters">
+      <div style="flex:1 1 320px"><label for="c{{ r.id }}">Comment <span class="hint">(required when rejecting)</span></label>
+        <input id="c{{ r.id }}" type="text" name="comment"></div>
+      <button class="btn primary" name="decision" value="approve">Approve</button>
+      <button class="btn danger" name="decision" value="reject">Reject</button>
+    </div>
+  </form>
+</section>
+{% else %}
+<section class="panel"><div class="empty">Nothing to approve. Requests from your team, or privileged requests if you're in IT Security, appear here.</div></section>
+{% endfor %}
+</div>
+{% endblock %}

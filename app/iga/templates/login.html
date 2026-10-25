@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block bare %}
+<div class="login">
+  <section class="story">
+    <div class="brand" style="color:#fff">
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
+        <rect width="30" height="30" rx="9" fill="#fff"/>
+        <rect x="7" y="9" width="16" height="3" rx="1.5" fill="#0F6B5E"/>
+        <rect x="7" y="13.5" width="10" height="3" rx="1.5" fill="#D9A042"/>
+        <rect x="7" y="18" width="13" height="3" rx="1.5" fill="#0F6B5E" opacity=".5"/>
+      </svg>
+      <span>Access Governance</span>
+    </div>
+    <div>
+      <h1>Every access has a start and an end.</h1>
+      <p>Request access for as long as you need it, approve what your team asks for, and review who still needs what. Your Active Directory account signs you in.</p>
+      <div class="mini-tl" aria-hidden="true">
+        <div style="width:92%;background:#9FDCCB"></div>
+        <div style="width:48%;margin-left:30%;background:repeating-linear-gradient(135deg,#F2C46B 0 5px,#DDA850 5px 9px)"></div>
+        <div style="width:64%;background:#5FC0AE;opacity:.55"></div>
+        <div style="width:22%;margin-left:12%;background:#0A4F45"></div>
+      </div>
+    </div>
+    <p class="small">corp.lab</p>
+  </section>
+  <section class="form">
+    <form method="post" action="/login">
+      <h2 style="font-size:1.5rem;font-weight:800;margin-bottom:4px">Welcome back</h2>
+      <p class="muted" style="margin-bottom:22px">Sign in with your Active Directory account.</p>
+      {% if error %}<div class="flash error" role="alert">{{ error }}</div>{% endif %}
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="field"><label for="u">Username</label>
+        <input id="u" type="text" name="username" value="{{ username }}" autocomplete="username" autofocus required></div>
+      <div class="field"><label for="p">Password</label>
+        <input id="p" type="password" name="password" autocomplete="current-password" required></div>
+      <button class="btn primary" style="width:100%;justify-content:center">Sign in</button>
+      <div class="demo">
+        <p>Lab accounts (password <code>Welc0me!Lab-2026</code>):</p>
+        <table>
+          <tr><td><code>hana.wijaya</code></td><td>HR Manager</td></tr>
+          <tr><td><code>sari.hakim</code></td><td>Security Analyst</td></tr>
+          <tr><td><code>fajar.nugroho</code></td><td>Finance Manager</td></tr>
+          <tr><td><code>joko.pratama</code></td><td>Finance Staff</td></tr>
+        </table>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ code }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ 'Not allowed' if code == 403 else ('Not found' if code == 404 else 'Something went wrong') }}</h1>
+<p>{{ message }}</p></div></div>
+<a class="btn" href="/">Go to home</a>
+{% endblock %}
+{% block bare %}
+<main><h1>{{ message }}</h1><p><a href="/login">Sign in</a></p></main>
+{% endblock %}

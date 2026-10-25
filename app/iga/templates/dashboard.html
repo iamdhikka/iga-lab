@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+{% set k = d.kpi %}
+<div class="page-head">
+  <div><h1>Dashboard</h1>
+    <p>{{ 'Whole organisation' if d.scope == 'all' else 'You and your direct reports' }}, requests created in the last {{ d.days }} days. Open tickets and temporary access are shown as of now.</p></div>
+  <div class="btn-row">
+    {% if 'hr' in user.roles or 'security' in user.roles %}
+    <div class="seg" aria-label="Scope">
+      <a href="?days={{ d.days }}&scope=all" class="{{ 'on' if d.scope == 'all' }}">Organisation</a>
+      <a href="?days={{ d.days }}&scope=team" class="{{ 'on' if d.scope == 'team' }}">My team</a>
+    </div>{% endif %}
+    <div class="seg" aria-label="Period">
+      {% for n in (7, 30, 90) %}<a href="?days={{ n }}&scope={{ d.scope }}" class="{{ 'on' if d.days == n }}">{{ n }} days</a>{% endfor %}
+    </div>
+  </div>
+</div>
+
+<section class="panel kpis" aria-label="Key figures">
+  <div class="kpi">
+    <span class="kpi-label">Open tickets</span>
+    <b>{{ k.open }}</b>
+    <span class="kpi-sub">{% if k.overdue %}<span class="flag bad">! {{ k.overdue }} past SLA</span>{% else %}<span class="flag ok">All within SLA</span>{% endif %}</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-label">Median time to decision</span>
+    <b>{{ k.median_h|hours }}</b>
+    <span class="kpi-sub">from request to final approval</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-label">Manager decisions within 48 h</span>
+    <b>{{ k.sla_rate if k.sla_rate is not none else '–' }}{{ '%' if k.sla_rate is not none }}</b>
+    <span class="kpi-sub">SLA for the first approval</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-label">Approved</span>
+    <b>{{ k.approval_rate if k.approval_rate is not none else '–' }}{{ '%' if k.approval_rate is not none }}</b>
+    <span class="kpi-sub">of {{ k.decided }} decided requests</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-label">Temporary grants in effect</span>
+    <b>{{ k.temporary }}</b>
+    <span class="kpi-sub">{{ k.privileged_temp }} privileged</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-label">Ending in 7 days</span>
+    <b>{{ k.expiring }}</b>
+    <span class="kpi-sub">removed automatically</span>
+  </div>
+</section>
+
+<div class="cols" style="margin-top:18px">
+  <section class="panel">
+    <header><div><h2>Open tickets by SLA</h2>
+      <p>Manager decision within 48 hours, IT Security within 24 hours. Most urgent first.</p></div>
+      <span class="small muted">{{ d.queue|length }} open</span></header>
+    <div class="table-wrap"><table>
+      <tr><th>Ticket</th><th>For</th><th>Waiting on</th><th>Waiting</th><th>SLA</th></tr>
+      {% for t in d.queue[:10] %}
+      <tr>
+        <td><a href="/requests/{{ t.id }}">#{{ t.id }} {% if t.kind == 'group' %}{{ t.target }}{% else %}Acting {{ POSITIONS[t.target].title }}{% endif %}</a>
+          {% if t.privileged %}<span class="chip priv">Privileged</span>{% endif %}</td>
+        <td>{{ t.who }}<div class="sub">{{ t.dept }}</div></td>
+        <td>{{ t.waiting }}</td>
+        <td class="when">{{ t.age_h|hours }}</td>
+        <td class="when">{% if t.overdue %}<span class="flag bad">! Overdue {{ (-t.left_h)|hours }}</span>
+          {% elif t.left_h < 8 %}<span class="flag warn">{{ t.left_h|hours }} left</span>
+          {% else %}<span class="flag ok">{{ t.left_h|hours }} left</span>{% endif %}</td>
+      </tr>
+      {% else %}<tr><td colspan="5" class="empty">No open tickets.</td></tr>{% endfor %}
+    </table></div>
+    {% if d.queue|length > 10 %}<div class="body small"><a href="/requests?scope={{ 'all' if 'security' in user.roles else 'team' }}">All {{ d.queue|length }} open tickets</a></div>{% endif %}
+  </section>
+  <section class="panel">
+    <header><div><h2>Open tickets by age</h2><p>Since the request was created.</p></div></header>
+    <div class="body">
+      {% set ages = ['< 1 day', '1–2 days', '2–3 days', '> 3 days'] %}
+      {% set amax = [d.aging.values()|max if d.aging else 0, 1]|max %}
+      <ul class="hbars" aria-label="Open tickets by age">
+        {% for a in ages %}{% set n = d.aging.get(a, 0) %}
+        <li title="{{ a }}: {{ n }} tickets"><span class="hb-label">{{ a }}</span>
+          <span class="hb-track"><span class="hb-bar age{{ loop.index }}" style="width:{{ (n * 100 / amax)|round }}%"></span></span>
+          <span class="hb-val">{{ n }}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+</div>
+
+<section class="panel" style="margin-top:18px">
+  <header><div><h2>Requests per day</h2><p>By outcome. Hover a day for the breakdown.</p></div>
+    <div class="legend" id="volume-legend"></div></header>
+  <div class="body"><div class="chart" style="height:260px"><canvas id="volume" role="img" aria-label="Requests per day by outcome"></canvas></div>
+    <details class="table-view"><summary>Show as table</summary>
+      <div class="table-wrap"><table><tr><th>Day</th>{% for s in d.volume.series %}<th>{{ s.label }}</th>{% endfor %}</tr>
+        {% for lbl in d.volume.labels %}{% set i = loop.index0 %}
+        <tr><td>{{ lbl }}</td>{% for s in d.volume.series %}<td>{{ s.data[i] }}</td>{% endfor %}</tr>{% endfor %}
+      </table></div></details>
+  </div>
+</section>
+
+<div class="cols-2" style="margin-top:18px">
+  <section class="panel">
+    <header><div><h2>Time to decision</h2><p>Median and slowest 10% (p90), in hours.</p></div></header>
+    <div class="body">
+      <div class="chart" style="height:180px"><canvas id="stages" role="img" aria-label="Decision time per stage"></canvas></div>
+      <table class="mini">
+        <tr><th>Stage</th><th>Median</th><th>p90</th><th>SLA</th><th>Decisions</th></tr>
+        {% for s in d.stages %}<tr><td>{{ s.label }}</td><td>{{ s.median|hours }}</td><td>{{ s.p90|hours }}</td>
+          <td>{{ (s.sla ~ ' h') if s.sla else '–' }}</td><td>{{ s.n }}</td></tr>{% endfor %}
+      </table>
+    </div>
+  </section>
+  <section class="panel">
+    <header><div><h2>Most requested access</h2><p>Purple marks privileged access.</p></div></header>
+    <div class="body">
+      {% set tmax = [d.top_access|map(attribute='count')|max if d.top_access else 0, 1]|max %}
+      <ul class="hbars">
+        {% for t in d.top_access %}
+        <li title="{{ t.label }}: {{ t.count }} requests"><span class="hb-label">{{ t.label }}</span>
+          <span class="hb-track"><span class="hb-bar {{ 'priv' if t.privileged else '' }}" style="width:{{ (t.count * 100 / tmax)|round }}%"></span></span>
+          <span class="hb-val">{{ t.count }}</span></li>
+        {% else %}<li class="muted">No requests in this period.</li>{% endfor %}
+      </ul>
+    </div>
+  </section>
+</div>
+
+<div class="cols-2" style="margin-top:18px">
+  <section class="panel">
+    <header><div><h2>Requests by department</h2></div></header>
+    <div class="table-wrap"><table>
+      <tr><th>Department</th><th>Requests</th><th>Approved</th><th>Rejected</th><th>Approval rate</th></tr>
+      {% for r in d.by_dept %}<tr><td>{{ r.dept }}</td><td>{{ r.total }}</td><td>{{ r.approved }}</td><td>{{ r.rejected }}</td>
+        <td>{% if r.rate is not none %}<span class="rate"><span style="width:{{ r.rate }}%"></span></span> {{ r.rate }}%{% else %}–{% endif %}</td></tr>
+      {% else %}<tr><td colspan="5" class="empty">No requests in this period.</td></tr>{% endfor %}
+    </table></div>
+  </section>
+  <section class="panel">
+    <header><div><h2>Temporary access ending in 7 days</h2><p>Removed from Active Directory the day after the end date.</p></div></header>
+    <div class="table-wrap"><table>
+      <tr><th>Person</th><th>Access</th><th>Ends</th></tr>
+      {% for e in d.expiring %}<tr><td><a href="/people/{{ e.employee_id }}">{{ e.first_name }} {{ e.last_name }}</a></td>
+        <td>{{ e.group_name }} <span class="chip {{ e.source }}">{{ SOURCE_LABEL[e.source] }}</span></td>
+        <td class="when">{{ e.expires_at|date }} <span class="sub">({{ e.expires_at|rel }})</span></td></tr>
+      {% else %}<tr><td colspan="3" class="empty">Nothing ends in the next 7 days.</td></tr>{% endfor %}
+    </table></div>
+  </section>
+</div>
+
+<div class="{{ 'cols-2' if d.alerts }}" style="margin-top:18px">
+  <section class="panel">
+    <header><div><h2>Joiners, movers and leavers</h2><p>Per week, last 12 weeks.</p></div>
+      <div class="legend" id="jml-legend"></div></header>
+    <div class="body">
+      <div class="chart" style="height:220px"><canvas id="jml" role="img" aria-label="Joiners, movers and leavers per week"></canvas></div>
+      {% if d.scheduled or d.failed_hr %}
+      <p class="small muted" style="margin:12px 0 0">{% if d.scheduled %}{{ d.scheduled|length }} scheduled: {% for h in d.scheduled %}{{ h.first_name }} {{ h.last_name }} ({{ h.kind }}, {{ h.effective_date|date }}){{ ', ' if not loop.last }}{% endfor %}.{% endif %}
+        {% if d.failed_hr %}<span class="flag bad">! {{ d.failed_hr }} failed HR change{{ 's' if d.failed_hr > 1 }}</span>{% endif %}</p>{% endif %}
+    </div>
+  </section>
+  {% if d.alerts %}
+  <section class="panel">
+    <header><div><h2>Security alerts</h2><p>Raised per day, last 14 days.</p></div><a class="small" href="/security">Open alerts</a></header>
+    <div class="body">
+      <div class="chart" style="height:160px"><canvas id="alerts" role="img" aria-label="Security alerts per day"></canvas></div>
+      <div class="alert-facts">
+        <div><b>{{ d.alerts.open }}</b><span>open, {{ d.alerts.open_critical }} critical or high</span></div>
+        <div><b>{{ d.alerts.mttr_h|hours }}</b><span>median time to resolve</span></div>
+      </div>
+      <table class="mini">{% for kind, n in d.alerts.kinds[:5] %}<tr><td>{{ ALERT_LABEL.get(kind, kind) }}</td><td>{{ n }}</td></tr>{% endfor %}</table>
+    </div>
+  </section>
+  {% endif %}
+</div>
+
+{% if d.review %}{% set r = d.review %}
+<section class="panel" style="margin-top:18px">
+  <header><div><h2>{{ r.c.name }}</h2><p>Due {{ r.c.due_date|date }} ({{ r.c.due_date|rel }}). {{ r.s.done }} of {{ r.s.total }} items decided, {{ r.s.revoked }} removed.</p></div>
+    {% if 'security' in user.roles %}<a class="small" href="/campaigns/{{ r.c.id }}">Campaign</a>{% endif %}</header>
+  <div class="table-wrap"><table>
+    <tr><th>Manager</th><th style="width:45%">Progress</th><th>Removed</th></tr>
+    {% for m in r.reviewers %}<tr><td>{{ m.first_name }} {{ m.last_name }}</td>
+      <td><div class="progress"><span style="width:{{ (m.done * 100 / m.total)|round }}%"></span></div><div class="sub">{{ m.done }} of {{ m.total }}</div></td>
+      <td>{{ m.revoked or 0 }}</td></tr>{% endfor %}
+  </table></div>
+</section>
+{% endif %}
+
+<script type="application/json" id="chart-data">{{ charts|tojson_safe|safe }}</script>
+<script src="/static/vendor/chart.umd.js"></script>
+<script src="/static/dashboard.js"></script>
+{% endblock %}

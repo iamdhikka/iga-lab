@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Requests{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Requests</h1><p>Every request, who decided, and when the access ends.</p></div>
+  <a class="btn primary" href="/requests/new">Request access</a>
+</div>
+<div style="margin-bottom:14px" class="seg" role="tablist">
+  <a href="/requests?scope=mine" class="{{ 'on' if scope == 'mine' }}">Mine</a>
+  {% if 'manager' in user.roles %}<a href="/requests?scope=team" class="{{ 'on' if scope == 'team' }}">My team</a>{% endif %}
+  {% if 'security' in user.roles %}<a href="/requests?scope=all" class="{{ 'on' if scope == 'all' }}">Everyone</a>{% endif %}
+</div>
+<section class="panel"><div class="table-wrap"><table>
+  <tr><th>#</th><th>For</th><th>Access</th><th>Period</th><th>Status</th></tr>
+  {% for r in rows %}{% set b = employees[r.beneficiary_id] %}
+  <tr><td><a href="/requests/{{ r.id }}">#{{ r.id }}</a></td>
+    <td>{{ full_name(b) }}<div class="sub">{{ POSITIONS[b.position].title }}</div></td>
+    <td>{% if r.kind == 'group' %}{{ r.target }}{% else %}Acting {{ POSITIONS[r.target].title }}{% endif %}
+      {% if r.privileged %}<span class="chip priv">Privileged</span>{% endif %}</td>
+    <td>{{ r.start_date|date }} to {{ r.end_date|date }}</td>
+    <td>{{ STATUS_LABEL[r.status] }}</td></tr>
+  {% else %}<tr><td colspan="5" class="empty">No requests yet. <a href="/requests/new">Request access</a> when you need it.</td></tr>{% endfor %}
+</table></div></section>
+{% endblock %}

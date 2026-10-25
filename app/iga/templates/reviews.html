@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Access reviews{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Access reviews</h1>
+  <p>{% if total %}Confirm that each person still needs each access. Removing it takes effect in Active Directory immediately. {{ done }} of {{ total }} done.{% else %}No reviews are assigned to you right now.{% endif %}</p></div></div>
+{% if risky_open %}<p class="review-note">Start with the {{ risky_open }} item{{ 's' if risky_open > 1 }} at the top: temporary or privileged access is where unneeded access usually hides. Role access below can be kept in one click per person.</p>{% endif %}
+{% if total %}<div class="progress" style="margin-bottom:20px"><span style="width:{{ (done * 100 / total)|round }}%"></span></div>{% endif %}
+<div class="stack">
+{% for emp_id, g in grouped.items() %}{% set e = g.emp %}
+{% set open_role = g['items']|selectattr('source', 'equalto', 'birthright')|rejectattr('decision')|list %}
+<section class="panel">
+  <header><div><h2><a href="/people/{{ emp_id }}">{{ e.first_name }} {{ e.last_name }}</a></h2><p>{{ POSITIONS[e.position].title }}, {{ e.sam }}</p></div>
+    {% if open_role %}<form method="post" action="/reviews/keep-role/{{ emp_id }}"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn small">Keep all {{ open_role|length }} role groups</button></form>{% endif %}</header>
+  <div class="table-wrap"><table>
+    <tr><th>Access</th><th>Why they have it</th><th>Since</th><th style="width:270px">Decision</th></tr>
+    {% for i in g['items'] %}
+    <tr>
+      <td><b>{{ i.group_name }}</b> {% if is_privileged(i.group_name) %}<span class="chip priv">Privileged</span>{% endif %}
+        <div class="sub">{{ GROUPS[i.group_name].description if i.group_name in GROUPS }}</div></td>
+      <td><span class="chip {{ 'role' if i.source == 'birthright' else i.source }}">{{ SOURCE_LABEL[i.source] }}</span>
+        {% if i.expires_at %}<div class="sub">ends {{ i.expires_at|date }}</div>{% endif %}</td>
+      <td>{{ i.granted_at|date }}</td>
+      <td>{% if i.decision %}
+          <span class="chip {{ 'ok' if i.decision == 'keep' else 'danger' }}">{{ 'Kept' if i.decision == 'keep' else 'Removed' }}</span>
+        {% else %}
+        <form method="post" action="/reviews/{{ i.id }}" class="btn-row">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="btn small" name="decision" value="keep">Keep</button>
+          <button class="btn small danger" name="decision" value="revoke">Remove</button>
+        </form>{% endif %}</td>
+    </tr>{% endfor %}
+  </table></div>
+</section>
+{% endfor %}
+</div>
+{% endblock %}

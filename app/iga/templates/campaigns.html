@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Review campaigns{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Review campaigns</h1>
+  <p>Ask every manager to confirm the access of their team. Auditors usually expect this every quarter, and every six months at minimum.</p></div></div>
+<div class="cols">
+  <section class="panel"><div class="table-wrap"><table>
+    <tr><th>Campaign</th><th>Scope</th><th>Due</th><th>Progress</th><th>Removed</th></tr>
+    {% for c in rows %}{% set s = stats[c.id] %}
+    <tr><td><a href="/campaigns/{{ c.id }}"><b>{{ c.name }}</b></a><div class="sub">started {{ c.created_at|date }} by {{ c.created_by }}</div></td>
+      <td>{{ 'All access' if c.scope == 'all' else 'Privileged only' }}</td>
+      <td>{{ c.due_date|date }}{% if c.status == 'closed' %}<div class="sub">closed</div>{% endif %}</td>
+      <td style="min-width:140px"><div class="progress"><span style="width:{{ s.pct }}%"></span></div><div class="sub">{{ s.done }} of {{ s.total }}</div></td>
+      <td>{{ s.revoked }}</td></tr>
+    {% else %}<tr><td colspan="5" class="empty">No campaigns yet. Start the first one to get a baseline.</td></tr>{% endfor %}
+  </table></div></section>
+  <form class="panel" method="post" action="/campaigns">
+    <header><h2>Start a campaign</h2></header>
+    <div class="body">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="field"><label for="n">Name</label><input id="n" type="text" name="name" value="Quarterly access review" required></div>
+      <div class="field"><label for="s">Scope</label><select id="s" name="scope">
+        <option value="all">All access</option><option value="privileged">Privileged access only</option></select>
+        <div class="hint">Each item goes to the person's current manager.</div></div>
+      <div class="field"><label for="d">Due</label><input id="d" type="date" name="due_date" value="{{ default_due }}" min="{{ today }}" required></div>
+      <button class="btn primary">Start campaign</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

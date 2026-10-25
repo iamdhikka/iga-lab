@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}People{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ 'People' if ('hr' in user.roles or 'security' in user.roles) else 'My team' }}</h1>
+    <p>{{ rows|length }} {{ 'person' if rows|length == 1 else 'people' }}{% if status %} with status {{ status }}{% endif %}.</p></div>
+  {% if 'hr' in user.roles %}<a class="btn primary" href="/people/new">Add new joiner</a>{% endif %}
+</div>
+<form class="filters" method="get" style="margin-bottom:16px">
+  <div><label for="q">Search</label><input id="q" type="search" name="q" value="{{ q }}" placeholder="Name, account or employee ID"></div>
+  <div><label for="dept">Department</label><select id="dept" name="dept"><option value="">All</option>
+    {% for d in depts %}<option {{ 'selected' if d == dept }}>{{ d }}</option>{% endfor %}</select></div>
+  <div><label for="status">Status</label><select id="status" name="status">
+    {% for v, l in [('active','Active'),('scheduled','Starting soon'),('terminated','Left'),('','All')] %}
+    <option value="{{ v }}" {{ 'selected' if v == status }}>{{ l }}</option>{% endfor %}</select></div>
+  <button class="btn">Filter</button>
+</form>
+<section class="panel"><div class="table-wrap"><table>
+  <tr><th>Name</th><th>Position</th><th>Manager</th><th>Access</th><th>Status</th></tr>
+  {% for e in rows %}{% set c = ent_counts.get(e.id) %}
+  <tr>
+    <td><div style="display:flex;gap:11px;align-items:center">{{ avatar(full_name(e), 'sm') }}<div><a href="/people/{{ e.id }}"><b>{{ full_name(e) }}</b></a><div class="sub">{{ e.sam or '-' }}, {{ e.id }}</div></div></div></td>
+    <td>{{ POSITIONS[e.position].title }}<div class="sub">{{ e.department }}</div>
+      {% if e.acting_position %}<span class="chip acting">Acting {{ POSITIONS[e.acting_position].title }}</span>{% endif %}</td>
+    <td>{% if e.manager_id %}{{ full_name(employees[e.manager_id]) }}{% else %}<span class="muted">None</span>{% endif %}</td>
+    <td>{% if c %}{{ c.n }} groups{% if c.temp %} <span class="chip request">{{ c.temp }} temporary</span>{% endif %}{% else %}<span class="muted">None</span>{% endif %}</td>
+    <td>{% if e.status == 'active' %}<span class="chip ok">Active</span>{% elif e.status == 'scheduled' %}<span class="chip neutral">Starts {{ e.start_date|date }}</span>{% else %}<span class="chip danger">Left {{ e.end_date|date }}</span>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="5" class="empty">No one matches these filters.</td></tr>{% endfor %}
+</table></div></section>
+{% endblock %}

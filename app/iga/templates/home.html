@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+{% set n = inbox|length + pending_reviews|length %}
+<section class="hello">
+  <div>
+    <h1>{{ greeting }}, {{ user.emp.first_name }}</h1>
+    <p>{% if n %}You have {{ n }} decision{{ 's' if n > 1 }} waiting. The oldest is at the top.{% else %}Nothing needs your decision right now.{% endif %}</p>
+  </div>
+  <div class="quick">
+    <a href="/requests/new">{{ icon('plus') }}<span><b>Request access</b>An app, share or VPN for a set period</span></a>
+    <a href="/requests/new?kind=acting">{{ icon('swap') }}<span><b>Cover a role</b>Act as someone else while they're away</span></a>
+    {% if 'hr' in user.roles %}<a href="/people/new">{{ icon('user-plus') }}<span><b>Add a new hire</b>Create the account and starting access</span></a>
+    {% else %}<a href="/people/{{ user.employee_id }}">{{ icon('timeline') }}<span><b>See my access</b>What you have and when it ends</span></a>{% endif %}
+  </div>
+</section>
+
+<div class="cols">
+  <div class="stack">
+    <section class="panel">
+      <header><div><h2>Waiting for you</h2>
+        <p>Requests to approve, and access of your team to confirm.</p></div></header>
+      {% if inbox or pending_reviews %}
+      <ul class="rows inbox">
+        {% for r in inbox %}{% set b = employees[r.beneficiary_id] %}
+        <li>
+          {{ avatar(full_name(b)) }}
+          <div class="grow">
+            <a class="title" href="/requests/{{ r.id }}"><b>{{ full_name(b) }}</b> needs
+              {% if r.kind == 'group' %}{{ r.target }}{% else %}to act as {{ POSITIONS[r.target].title }}{% endif %}</a>
+            {% if r.privileged %}<span class="chip priv">Privileged</span>{% endif %}
+            <div class="sub">{{ r.start_date|date }} to {{ r.end_date|date }}, asked {{ r.created_at|rel }}.
+              You decide as {{ 'their manager' if r.status == 'pending_manager' else 'IT Security' }}.</div>
+          </div>
+          <a class="btn small" href="/requests/{{ r.id }}">Review</a>
+        </li>
+        {% endfor %}
+        {% if pending_reviews %}
+        <li>
+          <span class="av md tint-temp" aria-hidden="true">{{ icon('reviews', 16) }}</span>
+          <div class="grow"><a class="title" href="/reviews"><b>{{ pending_reviews|length }} access items</b> to confirm in {{ pending_reviews[0].cname }}</a>
+            <div class="sub">Due {{ pending_reviews[0].due_date|date }} ({{ pending_reviews[0].due_date|rel }}).</div></div>
+          <a class="btn small" href="/reviews">Start review</a>
+        </li>
+        {% endif %}
+      </ul>
+      {% else %}
+      <div class="empty calm">
+        <svg width="54" height="54" viewBox="0 0 54 54" aria-hidden="true"><circle cx="27" cy="27" r="26" fill="#E1F2EC"/>
+          <path d="m17 28 7 7 14-15" fill="none" stroke="#0F6B5E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div><b>All clear.</b><br>New requests from your team will show up here.</div>
+      </div>
+      {% endif %}
+    </section>
+
+    {% if expiring %}
+    <section class="panel">
+      <header><div><h2>Ending soon</h2><p>Temporary access for you and your team. It's removed automatically on the end date.</p></div></header>
+      <ul class="rows">
+        {% for e in expiring %}
+        <li>
+          {{ avatar(e.first_name ~ ' ' ~ e.last_name, 'sm') }}
+          <div class="grow"><a href="/people/{{ e.employee_id }}">{{ e.first_name }} {{ e.last_name }}</a>
+            <span class="muted">has</span> {{ e.group_name }} <span class="chip {{ e.source }}">{{ SOURCE_LABEL[e.source] }}</span></div>
+          <span class="when-pill">{{ e.expires_at|rel }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+    {% if activity %}
+    <section class="panel">
+      <header><div><h2>What happened recently</h2></div><a href="/audit" class="small">Full audit log</a></header>
+      <ul class="feed">
+        {% for a in activity %}
+        <li class="{{ 'failed' if a.failed }}">
+          {{ avatar(a.actor, 'sm') }}
+          <p><b>{{ a.actor }}</b> {{ a.text }}</p>
+          <time title="{{ a.ts|dt }}">{{ a.ts|ago }}</time>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+  </div>
+
+  <div class="stack">
+    {% if health %}
+    <section class="panel health">
+      <header><h2>Organisation today</h2></header>
+      <div class="body">
+        <div class="tiles">
+          <div><b>{{ health.active }}</b><span>active employees</span></div>
+          <div><b>{{ health.privileged }}</b><span>with privileged access</span></div>
+          <div><b>{{ health.temporary }}</b><span>temporary grants</span></div>
+          {% set open_alerts = health.alerts|sum(attribute='n') %}
+          <a href="/security" class="{{ 'hot' if open_alerts }}"><b>{{ open_alerts }}</b><span>open alerts</span></a>
+        </div>
+        {% if health.alerts %}<p class="small muted" style="margin:12px 0 0">
+          {% for a in health.alerts %}<span class="sev {{ a.severity }}">{{ a.n }} {{ a.severity }}</span>{{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
+        {% if health.campaign %}
+        <div style="margin-top:18px">
+          <div class="small" style="display:flex;justify-content:space-between;margin-bottom:6px"><span>{{ health.campaign.name }}</span><b>{{ health.campaign_stats.pct }}%</b></div>
+          <div class="progress" aria-label="Review progress"><span style="width:{{ health.campaign_stats.pct }}%"></span></div>
+        </div>
+        {% endif %}
+        {% if health.reconcile %}<p class="small muted" style="margin:14px 0 0">AD last checked against the portal {{ health.reconcile.at|ago }}.</p>{% endif %}
+      </div>
+    </section>
+    {% if health.scheduled %}
+    <section class="panel">
+      <header><h2>Coming up from HR</h2></header>
+      <ul class="rows">{% for h in health.scheduled %}
+        <li>{{ avatar(h.first_name ~ ' ' ~ h.last_name, 'sm') }}
+          <div class="grow"><a href="/people/{{ h.employee_id }}">{{ h.first_name }} {{ h.last_name }}</a>
+          <div class="sub">{{ {'joiner':'Joins','mover':'Changes position','leaver':'Leaves'}[h.kind] }} {{ h.effective_date|rel }}</div></div>
+          <span class="chip neutral">{{ h.kind }}</span></li>{% endfor %}</ul>
+    </section>
+    {% endif %}
+    {% endif %}
+
+    <section class="panel">
+      <header><h2>Your access</h2><a class="small" href="/people/{{ user.employee_id }}">Timeline</a></header>
+      <ul class="rows tight">
+        {% for e in my_access %}
+        <li><span class="grow">{{ e.group_name }}</span>
+          {% if e.expires_at %}<span class="chip {{ e.source }}">until {{ e.expires_at|date }}</span>{% else %}<span class="chip role">{{ SOURCE_LABEL[e.source] }}</span>{% endif %}</li>
+        {% else %}<li class="muted">No access yet.</li>{% endfor %}
+      </ul>
+    </section>
+
+    {% if my_requests %}
+    <section class="panel">
+      <header><h2>Your requests</h2><a class="small" href="/requests">All</a></header>
+      <ul class="rows tight">{% for r in my_requests %}
+        <li><div class="grow"><a href="/requests/{{ r.id }}">{% if r.kind == 'group' %}{{ r.target }}{% else %}Acting {{ POSITIONS[r.target].title }}{% endif %}</a>
+          <div class="sub">#{{ r.id }}, {{ STATUS_LABEL[r.status]|lower }}</div></div>
+          <span class="dot {{ r.status }}" aria-hidden="true"></span></li>{% endfor %}</ul>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}New joiner{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Add new joiner</h1>
+  <p>The account is created on the start date with the access defined for the position. Nobody needs to pick groups by hand.</p></div></div>
+<div class="cols">
+  <form class="panel" method="post" action="/people/new">
+    <div class="body">
+      {% if error %}<div class="flash error" role="alert">{{ error }}</div>{% endif %}
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="grid-2">
+        <div class="field"><label for="fn">First name</label><input id="fn" type="text" name="first_name" value="{{ form.first_name or '' }}" required></div>
+        <div class="field"><label for="ln">Last name</label><input id="ln" type="text" name="last_name" value="{{ form.last_name or '' }}" required></div>
+      </div>
+      <div class="field"><label for="pos">Position</label>
+        <select id="pos" name="position" required><option value="">Choose a position</option>
+          {% for d in depts %}<optgroup label="{{ d }}">{% for k, p in POSITIONS.items() if p.department == d %}
+            <option value="{{ k }}" {{ 'selected' if form.position == k }}>{{ p.title }}</option>{% endfor %}</optgroup>{% endfor %}
+        </select></div>
+      <div class="field"><label for="mgr">Manager</label>
+        <select id="mgr" name="manager_id"><option value="">No manager</option>
+          {% for m in managers %}<option value="{{ m.id }}" {{ 'selected' if form.manager_id == m.id }}>{{ full_name(m) }}, {{ POSITIONS[m.position].title }}</option>{% endfor %}
+        </select><div class="hint">The manager approves this person's access requests and reviews their access.</div></div>
+      <div class="field" style="max-width:220px"><label for="sd">Start date</label>
+        <input id="sd" type="date" name="start_date" value="{{ form.start_date or today }}" min="{{ today }}" required></div>
+      <button class="btn primary">Add joiner</button>
+    </div>
+  </form>
+  <section class="panel">
+    <header><h2>Access by position</h2></header>
+    <ul class="rows">
+      {% for k, p in POSITIONS.items() %}
+      <li><b>{{ p.title }}</b><div class="sub muted small">{{ p.groups|join(', ') }}</div></li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Access catalog{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Access catalog</h1>
+  <p>What each group gives, whether it can be requested, and which positions get it automatically.</p></div>
+  <a class="btn primary" href="/requests/new">Request access</a></div>
+<section class="panel"><div class="table-wrap"><table>
+  <tr><th>Group</th><th>Can be requested</th><th>Included in positions</th><th>Holders</th></tr>
+  {% for g, m in GROUPS.items() %}
+  <tr><td><b>{{ g }}</b> {% if m.privileged %}<span class="chip priv">Privileged</span>{% endif %}<div class="sub">{{ m.description }}</div></td>
+    <td>{% if m.requestable %}Up to {{ m.max_days }} days{% if m.privileged %}, needs IT Security{% endif %}
+      <div><a class="small" href="/requests/new?target={{ g }}">Request</a></div>{% else %}<span class="muted">Position only</span>{% endif %}</td>
+    <td class="sub">{% for k, p in POSITIONS.items() if g in p.groups %}{{ p.title }}{{ ', ' if not loop.last }}{% else %}None{% endfor %}</td>
+    <td>{{ holders.get(g, 0) }}</td></tr>
+  {% endfor %}
+</table></div></section>
+<p class="small muted" style="margin-top:14px">Tier-0 groups such as Domain Admins are deliberately outside this portal. Its service account can't change them, and any change is raised as a critical alert.</p>
+{% endblock %}

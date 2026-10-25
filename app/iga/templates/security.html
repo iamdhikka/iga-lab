@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Security{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Security</h1>
+  <p>Sign-ins from the domain controller's audit log, and differences between Active Directory and what was approved here.</p></div>
+  <div class="seg"><a href="/security?show=open" class="{{ 'on' if show == 'open' }}">Open</a><a href="/security?show=all" class="{{ 'on' if show != 'open' }}">All</a></div>
+</div>
+
+<div class="cols" style="margin-bottom:18px">
+  <section class="panel">
+    <header><div><h2>Sign-ins, last 24 hours</h2><p>Green: successful. Red: failed.</p></div></header>
+    <div class="body">
+      <div class="spark" role="img" aria-label="Sign-ins per hour">
+        {% for s in series %}<div title="{{ s.hour }}: {{ s.ok }} successful, {{ s.bad }} failed">
+          <span class="ok" style="height:{{ (s.ok * 100 / peak)|round }}%"></span>
+          <span class="bad" style="height:{{ (s.bad * 100 / peak)|round }}%"></span></div>{% endfor %}
+      </div>
+      <div class="spark-axis">{% for s in series %}<span>{{ s.hour[:2] if loop.index0 % 4 == 0 else '' }}</span>{% endfor %}</div>
+    </div>
+  </section>
+  <section class="panel health">
+    <header><h2>Most failed sign-ins</h2></header>
+    <div class="body">
+      <dl>{% for t in top_failed %}<dt>{{ t.account }}</dt><dd>{{ t.n }}</dd>{% else %}<dt class="muted">No failures in 24 hours</dt><dd></dd>{% endfor %}</dl>
+      {% if recon %}<p class="small muted" style="margin:14px 0 0">AD compared with approved access {{ recon.at|dt }}: {{ recon.out_of_band }} unapproved, {{ recon.drift_fixed }} restored.</p>{% endif %}
+    </div>
+  </section>
+</div>
+
+<section class="panel">
+  <header><h2>Alerts</h2><span class="small muted">{{ alerts|length }} shown</span></header>
+  <ul class="rows">
+  {% for a in alerts %}{% set d = a.details|fromjson %}
+    <li>
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div><span class="sev {{ a.severity }}">{{ a.severity|capitalize }}</span> &nbsp;<b>{{ ALERT_LABEL.get(a.kind, a.kind) }}</b>: {{ a.subject }}
+          {% if d.group %}<span class="chip {{ 'priv' if d.privileged or a.kind == 'tier0_change' else 'neutral' }}">{{ d.group }}</span>{% endif %}
+          <div class="sub muted small">
+            {% if d.note %}{{ d.note }}. {% endif %}
+            {% if d.failures %}{{ d.failures }} failed attempts in {{ d.window_minutes }} minutes{{ ', account locked' if d.locked_out }}. {% endif %}
+            {% if d.distinct_accounts %}{{ d.distinct_accounts }} different accounts from one address: {{ d.accounts|join(', ') }}. {% endif %}
+            {% if d.changed %}Changed by <b>{{ d.changed.by }}</b> at {{ d.changed.at|dt }} from {{ d.changed.from }}. {% endif %}
+            {% if d.at %}At {{ d.at|dt }}{{ ' from ' ~ d.source if d.source }}. {% endif %}
+            Raised {{ a.ts|dt }}.</div>
+        </div>
+        {% if a.status == 'resolved' %}<span class="small muted">Resolved by {{ a.resolved_by }}: {{ a.resolution }}</span>{% endif %}
+      </div>
+      {% if a.status == 'open' %}
+      <details style="margin-top:8px"><summary>Resolve</summary>
+        <form method="post" action="/alerts/{{ a.id }}/resolve" class="filters" style="margin-top:8px">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <div><label for="act{{ a.id }}">Action</label><select id="act{{ a.id }}" name="action">
+            {% if a.kind == 'out_of_band_grant' %}<option value="remove">Remove the access from AD</option><option value="adopt">Accept as a 30-day exception</option>
+            {% elif a.kind == 'leaver_enabled' %}<option value="remove">Disable the account again</option>
+            {% endif %}<option value="close">Close, no change</option></select></div>
+          <div style="flex:1 1 260px"><label for="n{{ a.id }}">Note</label><input id="n{{ a.id }}" type="text" name="note" required placeholder="What you checked and why"></div>
+          <button class="btn small">Resolve</button>
+        </form>
+      </details>
+      {% endif %}
+    </li>
+  {% else %}<li class="empty">No {{ 'open ' if show == 'open' }}alerts.</li>{% endfor %}
+  </ul>
+</section>
+{% endblock %}

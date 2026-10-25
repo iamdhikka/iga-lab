@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Audit log{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Audit log</h1><p>Every change made by the portal, and by whom. Newest first, last 300 entries.</p></div>
+  <a class="btn" href="/audit.csv">Download all (CSV)</a></div>
+<form class="filters" method="get" style="margin-bottom:16px">
+  <div><label for="q">Search</label><input id="q" type="search" name="q" value="{{ q }}" placeholder="Person, account or group"></div>
+  <div><label for="a">Action</label><select id="a" name="action"><option value="">All</option>
+    {% for x in actions %}<option value="{{ x }}" {{ 'selected' if x == action }}>{{ x|replace('_', ' ') }}</option>{% endfor %}</select></div>
+  <button class="btn">Filter</button>
+</form>
+<section class="panel"><div class="table-wrap"><table>
+  <tr><th>When</th><th>Who</th><th>Action</th><th>Target</th><th>Details</th></tr>
+  {% for r in rows %}
+  <tr><td class="sub" style="white-space:nowrap">{{ r.ts|dt }}</td><td>{{ r.actor }}</td>
+    <td>{{ r.action|replace('_', ' ') }}{% if r.result != 'success' %} <span class="chip {{ 'danger' if r.result == 'failure' else 'request' }}">{{ r.result }}</span>{% endif %}</td>
+    <td>{{ r.target or '' }}</td>
+    <td class="kv">{% if r.details %}{% set d = r.details|fromjson if r.details.startswith('{') else {} %}
+      {% for k, v in d.items() if v not in (None, '', [], False) %}{{ k }}: {{ v }}{{ '; ' if not loop.last }}{% endfor %}{% endif %}</td></tr>
+  {% else %}<tr><td colspan="5" class="empty">No entries match.</td></tr>{% endfor %}
+</table></div></section>
+{% endblock %}

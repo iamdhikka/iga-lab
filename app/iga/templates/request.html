@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Request #{{ req.id }}{% endblock %}
+{% block content %}
+{% set requester = employees[req.requested_by] %}
+<div class="page-head">
+  <div><h1>{% if req.kind == 'group' %}{{ req.target }} for {{ full_name(ben) }}{% else %}{{ full_name(ben) }} acting as {{ POSITIONS[req.target].title }}{% endif %}</h1>
+    <p>Request #{{ req.id }} &nbsp;<span class="chip {{ 'ok' if req.status == 'active' else ('danger' if req.status in ('rejected','revoked') else 'neutral') }}">{{ STATUS_LABEL[req.status] }}</span>
+      {% if req.privileged %}<span class="chip priv">Privileged</span>{% endif %}</p></div>
+  <div class="btn-row">
+    {% if can_cancel %}<form method="post" action="/requests/{{ req.id }}/cancel"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Cancel request</button></form>{% endif %}
+    {% if can_revoke %}<form method="post" action="/requests/{{ req.id }}/revoke"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn danger">Remove access now</button></form>{% endif %}
+  </div>
+</div>
+
+<div class="cols">
+  <div class="stack">
+    <section class="panel">
+      <header><h2>What is being asked</h2></header>
+      <div class="body">
+        <dl class="facts">
+          <dt>For</dt><dd><a href="/people/{{ ben.id }}">{{ full_name(ben) }}</a>, {{ POSITIONS[ben.position].title }}</dd>
+          <dt>Requested by</dt><dd>{{ full_name(requester) }}{{ ' (self)' if requester.id == ben.id }}, {{ req.created_at|dt }}</dd>
+          <dt>Access</dt><dd>{% if req.kind == 'group' %}<b>{{ req.target }}</b>: {{ GROUPS[req.target].description }}{% else %}
+            Position <b>{{ POSITIONS[req.target].title }}</b>{% endif %}</dd>
+          <dt>Period</dt><dd>{{ req.start_date|date }} to {{ req.end_date|date }} ({{ days }} day{{ 's' if days > 1 }})</dd>
+        </dl>
+        <h3 style="margin:16px 0 6px">Reason</h3>
+        <p style="white-space:pre-line;max-width:70ch">{{ req.justification }}</p>
+        {% if req.kind == 'acting' %}
+        <h3 style="margin:16px 0 6px">Access added for this period</h3>
+        {% if adds %}<p>{% for g in adds %}<span class="chip {{ 'priv' if is_privileged(g) else 'acting' }}">{{ g }}</span> {% endfor %}</p>
+        {% else %}<p class="muted">{{ full_name(ben) }} already has all the access of this position.</p>{% endif %}
+        {% endif %}
+      </div>
+      {% if stage %}
+      <form class="decision" method="post" action="/requests/{{ req.id }}/decide">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <h3 style="margin-bottom:8px">Your decision as {{ 'manager' if stage == 'manager' else 'IT Security' }}</h3>
+        {% if stage == 'manager' and req.privileged %}<p class="small muted">After you approve, IT Security also has to approve because this is privileged access.</p>{% endif %}
+        <div class="field"><label for="c">Comment <span class="hint">(required when rejecting)</span></label>
+          <textarea id="c" name="comment" style="min-height:60px"></textarea></div>
+        <div class="btn-row"><button class="btn primary" name="decision" value="approve">Approve</button>
+          <button class="btn danger" name="decision" value="reject">Reject</button></div>
+      </form>
+      {% endif %}
+    </section>
+  </div>
+
+  <section class="panel">
+    <header><h2>Progress</h2></header>
+    <div class="body small">
+      <ol class="steps">
+        <li class="done"><b>Requested</b><br><span class="muted">{{ req.created_at|dt }}</span></li>
+        {% if req.manager_id and req.manager_id != req.requested_by %}
+        <li class="{{ 'done' if req.manager_decision == 'approved' else ('no' if req.manager_decision == 'rejected' else ('now' if req.status == 'pending_manager' else '')) }}">
+          <b>Manager: {{ full_name(employees[req.manager_id]) }}</b><br>
+          <span class="muted">{% if req.manager_decision %}{{ req.manager_decision|capitalize }} {{ req.manager_at|dt }}{% if req.manager_comment %}: "{{ req.manager_comment }}"{% endif %}{% else %}Waiting{% endif %}</span></li>
+        {% endif %}
+        {% if req.privileged or not req.manager_id or req.manager_id == req.requested_by %}
+        <li class="{{ 'done' if req.security_decision == 'approved' else ('no' if req.security_decision == 'rejected' else ('now' if req.status == 'pending_security' else '')) }}">
+          <b>IT Security</b><br>
+          <span class="muted">{% if req.security_decision %}{{ req.security_decision|capitalize }} by {{ full_name(employees[req.security_by]) }} {{ req.security_at|dt }}{% if req.security_comment %}: "{{ req.security_comment }}"{% endif %}{% else %}{{ 'Waiting' if req.status in ('pending_manager','pending_security') else 'Not needed' }}{% endif %}</span></li>
+        {% endif %}
+        <li class="{{ 'done' if req.status in ('active','expired','revoked') else ('now' if req.status == 'scheduled' else '') }}">
+          <b>Access added</b><br><span class="muted">{{ req.start_date|date }}</span></li>
+        <li class="{{ 'done' if req.status in ('expired','revoked') else '' }}">
+          <b>{{ 'Removed early' if req.status == 'revoked' else 'Access removed' }}</b><br>
+          <span class="muted">{% if req.closed_at and req.status in ('expired','revoked') %}{{ req.closed_at|dt }}{% else %}After {{ req.end_date|date }}{% endif %}</span></li>
+      </ol>
+    </div>
+  </section>
+</div>
+{% endblock %}

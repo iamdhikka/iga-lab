@@ -1,0 +1,12 @@
+# Konfigurasi MySQL untuk portal IGA (lab).
+[mysqld]
+character-set-server = utf8mb4
+# Perbandingan teks persis (case-sensitive), sama seperti nilai di AD dan log audit
+collation-server     = utf8mb4_0900_bin
+skip-name-resolve
+# Lab kecil: cukup memori sedikit
+innodb_buffer_pool_size = 256M
+max_connections         = 100
+# Log query lambat untuk latihan tuning (lihat juga proyek mysql-observability-tuning)
+slow_query_log          = ON
+long_query_time         = 0.5

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Request access{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ 'Request access' if kind == 'group' else 'Request an acting position' }}</h1>
+  <p>Every request has an end date. Access is added on the start date and removed automatically after the end date.</p></div></div>
+
+<nav class="choice" aria-label="Request type">
+  <a href="/requests/new?kind=group&for={{ form.beneficiary_id }}" class="{{ 'on' if kind == 'group' }}"><b>Access to a system or folder</b>
+    <span>For example VPN, CRM, or admin rights on a server for a few days.</span></a>
+  <a href="/requests/new?kind=acting&for={{ form.beneficiary_id }}" class="{{ 'on' if kind == 'acting' }}"><b>Temporary position</b>
+    <span>Covering for someone: you get the access of that position until the end date.</span></a>
+</nav>
+
+<div class="cols">
+<form class="panel" method="post" action="/requests/new">
+  <div class="body">
+    {% if error %}<div class="flash error" role="alert">{{ error }}</div>{% endif %}
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="kind" value="{{ kind }}">
+    <div class="field"><label for="ben">For</label>
+      <select id="ben" name="beneficiary_id">{% for b in beneficiaries %}
+        <option value="{{ b.id }}" {{ 'selected' if b.id == form.beneficiary_id }}>{{ full_name(b) }}{{ ' (me)' if b.id == user.employee_id }}, {{ POSITIONS[b.position].title }}</option>{% endfor %}
+      </select></div>
+
+    {% if kind == 'group' %}
+    <div class="field"><label for="tgt">Access</label>
+      <select id="tgt" name="target" required><option value="">Choose access</option>
+        {% for g, m in requestable.items() %}<option value="{{ g }}" {{ 'selected' if form.target == g }}>{{ g }}: {{ m.description }} (max {{ m.max_days }} days{{ ', needs IT Security approval' if m.privileged }})</option>{% endfor %}
+      </select></div>
+    {% else %}
+    <div class="field"><label for="tgt">Act as</label>
+      <select id="tgt" name="target" required><option value="">Choose a position</option>
+        {% for k, p in POSITIONS.items() %}<option value="{{ k }}" {{ 'selected' if form.target == k }}>{{ p.title }} ({{ p.department }})</option>{% endfor %}
+      </select><div class="hint">Only the access you don't already have is added, and only for this period.</div></div>
+    {% endif %}
+
+    <div class="grid-2">
+      <div class="field"><label for="sd">From</label><input id="sd" type="date" name="start_date" value="{{ form.start_date }}" min="{{ today }}" required></div>
+      <div class="field"><label for="ed">Until (last day)</label><input id="ed" type="date" name="end_date" value="{{ form.end_date }}" min="{{ today }}" required></div>
+    </div>
+    <div class="field"><label for="why">Why is it needed?</label>
+      <textarea id="why" name="justification" required minlength="15" placeholder="What task needs this access, and why it can't be done without it">{{ form.justification or '' }}</textarea></div>
+    <button class="btn primary">Send request</button>
+  </div>
+</form>
+<section class="panel">
+  <header><h2>Who approves</h2></header>
+  <div class="body small">
+    <ol class="steps">
+      <li class="done"><b>You send the request</b><br><span class="muted">You can cancel it until it's approved.</span></li>
+      <li><b>Manager</b><br><span class="muted">The direct manager of the person who gets the access. You can't approve your own request.</span></li>
+      <li><b>IT Security</b><br><span class="muted">Only for privileged access, such as server admin, payment approval or confidential HR data.</span></li>
+      <li><b>Access added, then removed</b><br><span class="muted">Added in Active Directory on the start date, removed the day after the end date.</span></li>
+    </ol>
+  </div>
+</section>
+</div>
+{% endblock %}
